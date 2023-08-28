@@ -11,7 +11,7 @@ class HttpRequest(object):
         self.method = method
         self.uri = uri
         self.headers = headers
-        self.remote_host = environ['REMOTE_HOST']
+        self.remote_host = environ.get('REMOTE_HOST', '')
         self.path = uri.split('?', 1)[0]
         self.query = parse_qs(uri.split('?', 1)[1]) if uri.find('?') != -1 else {}
         self.body = body
