@@ -19,10 +19,13 @@ class HttpRequest(object):
         self.body = body
 
     @classmethod
-    def parse(cls: t.Type['HttpRequest']) -> 'HttpRequest':
+    def parse(cls: t.Type['HttpRequest'], reader: t.Optional[t.TextIO]=None) -> 'HttpRequest':
         HTTP_START_LINE = 0
         HTTP_HEADERS = 1
         HTTP_BODY = 2
+
+        if reader is None:
+            reader = sys.stdin
 
         parser_mode = HTTP_START_LINE
         request_headers = {} # type: t.Dict[str, str]
@@ -33,11 +36,11 @@ class HttpRequest(object):
         body = None
         while True:
             if parser_mode == HTTP_START_LINE:
-                line = input().strip()
+                line = reader.readline().strip()
                 method, uri, version = line.split(' ')
                 parser_mode = HTTP_HEADERS
             elif parser_mode == HTTP_HEADERS:
-                line = input().strip()
+                line = reader.readline().strip()
                 if line == '':
                     body_size = int(request_headers.get('content-length', 0))
                     if body_size > 0:
@@ -50,7 +53,7 @@ class HttpRequest(object):
                 header_value = parts[1].strip()
                 request_headers[header_name] = header_value
             elif parser_mode == HTTP_BODY:
-                body = sys.stdin.read(body_size)
+                body = reader.read(body_size)
                 break
 
         return cls(method, uri, request_headers, dict(os.environ), body)
@@ -77,18 +80,20 @@ class HttpResponse(object):
         self.body = json.dumps(data)
         self.is_binary = False
     
-    def output(self) -> None:
-        sys.stdout.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]))
+    def output(self, writer: t.Optional[t.BinaryIO]=None) -> None:
+        if writer is None:
+            writer = sys.stdout
+        writer.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]))
         if self.body is not None:
             self.headers['content-length'] = str(len(self.body))
         for k, v in self.headers.items():
-            sys.stdout.write('{}: {}\r\n'.format(k, v))
-        sys.stdout.write('\r\n')
-        sys.stdout.flush()
+            writer.write('{}: {}\r\n'.format(k, v))
+        writer.write('\r\n')
+        writer.flush()
         if self.is_binary and isinstance(self.body, bytes):
-            sys.stdout.buffer.write(self.body)
+            writer.buffer.write(self.body)
         elif isinstance(self.body, str):
-            sys.stdout.write(self.body)
+            writer.write(self.body)
 
 def run(handler: t.Callable[[HttpRequest, HttpResponse], None]) -> None:
     try:
@@ -97,4 +102,5 @@ def run(handler: t.Callable[[HttpRequest, HttpResponse], None]) -> None:
         handler(req, res)
         res.output()
     except:
+        traceback.print_exc()
         sys.stdout.write(CRITICAL_ERROR_RESPONSE)
