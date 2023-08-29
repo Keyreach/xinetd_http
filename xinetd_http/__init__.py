@@ -80,6 +80,19 @@ class HttpResponse(object):
         self.body = json.dumps(data)
         self.is_binary = False
     
+    def set_content_type(self, content_type: str) -> None:
+        self.headers['content-type'] = content_type
+    
+    def set_text(self, text: str) -> None:
+        self.headers['content-type'] = 'text/plain; charset=utf-8'
+        self.body = text
+        self.is_binary = False
+    
+    def redirect(self, location: str, status_code: int=303) -> None:
+        self.status = status_code
+        self.headers['location'] = location
+        self.body = None
+    
     def output(self, writer: t.Optional[t.TextIO]=None) -> None:
         if writer is None:
             writer = sys.stdout
