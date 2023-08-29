@@ -80,7 +80,7 @@ class HttpResponse(object):
         self.body = json.dumps(data)
         self.is_binary = False
     
-    def output(self, writer: t.Optional[t.BinaryIO]=None) -> None:
+    def output(self, writer: t.Optional[t.TextIO]=None) -> None:
         if writer is None:
             writer = sys.stdout
         writer.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]))
@@ -102,5 +102,4 @@ def run(handler: t.Callable[[HttpRequest, HttpResponse], None]) -> None:
         handler(req, res)
         res.output()
     except:
-        traceback.print_exc()
         sys.stdout.write(CRITICAL_ERROR_RESPONSE)
