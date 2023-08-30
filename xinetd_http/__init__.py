@@ -5,6 +5,8 @@ from urllib.parse import parse_qs
 from http.client import responses
 import typing as t
 
+BEFORE_REQUEST = 0
+AFTER_REQUEST = 1
 CRITICAL_ERROR_RESPONSE = 'HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nInternal Server Error\r\n'
 
 class HttpRequest(object):
@@ -108,17 +110,19 @@ class HttpResponse(object):
         elif isinstance(self.body, str):
             writer.write(self.body)
 
-def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.List[t.Callable[[HttpRequest, HttpResponse], bool]]) -> None:
+def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]) -> None:
     try:
         req = HttpRequest.parse()
         res = HttpResponse(200)
         proceed = True
         for m in middlewares:
-            proceed = m(req, res)
+            proceed = m(req, res, BEFORE_REQUEST)
             if proceed is False:
                 break
         if not proceed is False:
             handler(req, res)
+            for m in reversed(middlewares):
+                m(req, res, AFTER_REQUEST)
         res.output()
     except:
         sys.stdout.write(CRITICAL_ERROR_RESPONSE)

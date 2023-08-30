@@ -1,7 +1,7 @@
 import socketserver
 import traceback
 import typing as t
-from xinetd_http import HttpRequest, HttpResponse, CRITICAL_ERROR_RESPONSE
+from xinetd_http import HttpRequest, HttpResponse, CRITICAL_ERROR_RESPONSE, BEFORE_REQUEST, AFTER_REQUEST
 
 class IOWrapper():
   def __init__(self, buffer) -> None:
@@ -27,11 +27,13 @@ class TestStreamHandler(socketserver.StreamRequestHandler):
         res = HttpResponse(200)
         proceed = True
         for m in self.server.middlewares:
-            proceed = m(req, res)
+            proceed = m(req, res, BEFORE_REQUEST)
             if proceed is False:
                 break
         if not proceed is False:
             self.server.handler_func(req, res)
+            for m in reversed(self.server.middlewares):
+                m(req, res, AFTER_REQUEST)
         print('[{}] {} {}'.format(
           res.status,
           req.method,
