@@ -112,11 +112,13 @@ class HttpResponse(object):
         if body is not None:
             writer.buffer.write(body)
 
-def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]) -> None:
+def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.Optional[t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]]=None) -> None:
     try:
         req = HttpRequest.parse()
         res = HttpResponse(200)
         proceed = True
+        if middlewares is None:
+            middlewares = []
         for m in middlewares:
             proceed = m(req, res, BEFORE_REQUEST)
             if proceed is False:
