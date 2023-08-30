@@ -24,6 +24,7 @@ class TestStreamHandler(socketserver.StreamRequestHandler):
   def handle(self):
     try:
         req = HttpRequest.parse(reader=IOWrapper(self.rfile))
+        req.remote_host = self.client_address[0]
         res = HttpResponse(200)
         proceed = True
         for m in self.server.middlewares:

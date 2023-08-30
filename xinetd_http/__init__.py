@@ -67,6 +67,12 @@ class HttpResponse(object):
         self.body = body
         self.is_binary = False
     
+    def copy_from(self, response: 'HttpResponse') -> None:
+        self.status = response.status
+        self.headers = response.headers
+        self.body = response.body
+        self.is_binary = response.is_binary
+    
     def set_status(self, status_code: int) -> None:
         self.status = status_code
     
