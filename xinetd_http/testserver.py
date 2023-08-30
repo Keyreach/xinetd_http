@@ -25,7 +25,13 @@ class TestStreamHandler(socketserver.StreamRequestHandler):
     try:
         req = HttpRequest.parse(reader=IOWrapper(self.rfile))
         res = HttpResponse(200)
-        self.server.handler_func(req, res)
+        proceed = True
+        for m in self.server.middlewares:
+            proceed = m(req, res)
+            if proceed is False:
+                break
+        if not proceed is False:
+            self.server.handler_func(req, res)
         print('[{}] {} {}'.format(
           res.status,
           req.method,
@@ -38,11 +44,12 @@ class TestStreamHandler(socketserver.StreamRequestHandler):
 
 class TestServer(socketserver.TCPServer):
   allow_reuse_address = True
-  def __init__(self, host, port, func):
+  def __init__(self, host, port, func, middlewares=None):
     super().__init__((host, port), TestStreamHandler)
     self.handler_func = func
+    self.middlewares = [] if middlewares is None else middlewares
 
-def run(handler):
-  srv = TestServer('localhost', 3000, handler)
+def run(handler, middlewares):
+  srv = TestServer('localhost', 3000, handler, middlewares)
   print('Starting server at localhost:3000')
   srv.serve_forever()

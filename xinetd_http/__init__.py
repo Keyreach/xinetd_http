@@ -108,11 +108,17 @@ class HttpResponse(object):
         elif isinstance(self.body, str):
             writer.write(self.body)
 
-def run(handler: t.Callable[[HttpRequest, HttpResponse], None]) -> None:
+def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.List[t.Callable[[HttpRequest, HttpResponse], bool]]) -> None:
     try:
         req = HttpRequest.parse()
         res = HttpResponse(200)
-        handler(req, res)
+        proceed = True
+        for m in middlewares:
+            proceed = m(req, res)
+            if proceed is False:
+                break
+        if not proceed is False:
+            handler(req, res)
         res.output()
     except:
         sys.stdout.write(CRITICAL_ERROR_RESPONSE)
