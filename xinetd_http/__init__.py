@@ -99,16 +99,18 @@ class HttpResponse(object):
         if writer is None:
             writer = sys.stdout
         writer.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]))
-        if self.body is not None:
-            self.headers['content-length'] = str(len(self.body))
+        body = None # type: t.Optional[bytes]
+        if not self.is_binary and isinstance(self.body, str):
+            body = self.body.encode('utf-8')
+        elif isinstance(self.body, bytes):
+            body = self.body
+        self.headers['content-length'] = '0' if body is None else str(len(body))
         for k, v in self.headers.items():
             writer.write('{}: {}\r\n'.format(k, v))
         writer.write('\r\n')
         writer.flush()
-        if self.is_binary and isinstance(self.body, bytes):
-            writer.buffer.write(self.body)
-        elif isinstance(self.body, str):
-            writer.write(self.body)
+        if body is not None:
+            writer.buffer.write(body)
 
 def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]) -> None:
     try:
