@@ -21,13 +21,13 @@ class HttpRequest(object):
         self.body = body
 
     @classmethod
-    def parse(cls: t.Type['HttpRequest'], reader: t.Optional[t.TextIO]=None) -> 'HttpRequest':
+    def parse(cls: t.Type['HttpRequest'], reader: t.Optional[t.BinaryIO]=None) -> 'HttpRequest':
         HTTP_START_LINE = 0
         HTTP_HEADERS = 1
         HTTP_BODY = 2
 
         if reader is None:
-            reader = sys.stdin
+            reader = sys.stdin.buffer
 
         parser_mode = HTTP_START_LINE
         request_headers = {} # type: t.Dict[str, str]
@@ -39,18 +39,18 @@ class HttpRequest(object):
         while True:
             if parser_mode == HTTP_START_LINE:
                 line = reader.readline().strip()
-                method, uri, version = line.split(' ')
+                method, uri, version = line.decode('ascii').split(' ')
                 parser_mode = HTTP_HEADERS
             elif parser_mode == HTTP_HEADERS:
                 line = reader.readline().strip()
-                if line == '':
+                if line == b'':
                     body_size = int(request_headers.get('content-length', 0))
                     if body_size > 0:
                         parser_mode = HTTP_BODY
                         continue
                     else:
                         break
-                parts = line.split(':', 1)
+                parts = line.decode('utf-8').split(':', 1)
                 header_name = parts[0].lower()
                 header_value = parts[1].strip()
                 request_headers[header_name] = header_value
@@ -66,45 +66,45 @@ class HttpResponse(object):
         self.headers = {} if headers is None else headers
         self.body = body
         self.is_binary = False
-    
+
     def copy_from(self, response: 'HttpResponse') -> None:
         self.status = response.status
         self.headers = response.headers
         self.body = response.body
         self.is_binary = response.is_binary
-    
+
     def set_status(self, status_code: int) -> None:
         self.status = status_code
-    
+
     def set_header(self, name: str, value: str) -> None:
         self.headers[name] = value
-    
+
     def set_body(self, body: t.Union[str, bytes]) -> None:
         self.body = body
         self.is_binary = isinstance(body, bytes)
-    
+
     def set_json(self, data: t.Any) -> None:
         self.headers['content-type'] = 'application/json';
         self.body = json.dumps(data)
         self.is_binary = False
-    
+
     def set_content_type(self, content_type: str) -> None:
         self.headers['content-type'] = content_type
-    
+
     def set_text(self, text: str) -> None:
         self.headers['content-type'] = 'text/plain; charset=utf-8'
         self.body = text
         self.is_binary = False
-    
+
     def redirect(self, location: str, status_code: int=303) -> None:
         self.status = status_code
         self.headers['location'] = location
         self.body = None
-    
-    def output(self, writer: t.Optional[t.TextIO]=None) -> None:
+
+    def output(self, writer: t.Optional[t.BinaryIO]=None) -> None:
         if writer is None:
-            writer = sys.stdout
-        writer.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]))
+            writer = sys.stdout.buffer
+        writer.write('HTTP/1.1 {} {}\r\n'.format(self.status, responses[self.status]).encode('utf-8'))
         body = None # type: t.Optional[bytes]
         if not self.is_binary and isinstance(self.body, str):
             body = self.body.encode('utf-8')
@@ -112,11 +112,12 @@ class HttpResponse(object):
             body = self.body
         self.headers['content-length'] = '0' if body is None else str(len(body))
         for k, v in self.headers.items():
-            writer.write('{}: {}\r\n'.format(k, v))
-        writer.write('\r\n')
+            writer.write('{}: {}\r\n'.format(k, v).encode('utf-8'))
+        writer.write(b'\r\n')
         writer.flush()
         if body is not None:
-            writer.buffer.write(body)
+            writer.write(body)
+            writer.flush()
 
 def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.Optional[t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]]=None) -> None:
     try:
@@ -135,4 +136,4 @@ def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.O
                 m(req, res, AFTER_REQUEST)
         res.output()
     except:
-        sys.stdout.write(CRITICAL_ERROR_RESPONSE)
+        sys.stdout.write(CRITICAL_ERROR_RESPONSE + traceback.format_exc())

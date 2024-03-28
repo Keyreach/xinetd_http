@@ -8,13 +8,13 @@ class IOWrapper():
     self.buffer = buffer
 
   def readline(self) -> str:
-    return self.buffer.readline().decode('utf-8')
+    return self.buffer.readline()
 
   def read(self, n: t.Optional[int]=None) -> str:
-    return self.buffer.read(n).decode('utf-8')
+    return self.buffer.read(n)
 
   def write(self, data: str) -> int:
-    return self.buffer.write(data.encode('utf-8'))
+    return self.buffer.write(data)
 
   def flush(self) -> None:
     return self.buffer.flush()
