@@ -10,15 +10,22 @@ AFTER_REQUEST = 1
 CRITICAL_ERROR_RESPONSE = 'HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nInternal Server Error\r\n'
 
 class HttpRequest(object):
+    __slots__ = ['method', 'uri', 'headers', 'remote_host', 'path', 'query_string', 'query', 'body', 'context']
 
-    def __init__(self, method: str, uri: str, headers: t.Dict[str, str], environ: t.Dict[str, str], body: t.Optional[str]):
+    def __init__(self, method: str, uri: str, headers: t.Dict[str, str], environ: t.Dict[str, str], body: t.Optional[bytes]):
         self.method = method
         self.uri = uri
         self.headers = headers
         self.remote_host = environ.get('REMOTE_HOST', '')
         self.path = uri.split('?', 1)[0]
-        self.query = parse_qs(uri.split('?', 1)[1]) if uri.find('?') != -1 else {}
+        self.query_string = ''
+        self.query = {}
+        if uri.find('?') != -1:
+            _, qs = uri.split('?', 1)
+            self.query_string = qs
+            self.query = parse_qs(qs)
         self.body = body
+        self.context = {} # type: t.Dict[str, t.Any]
 
     @classmethod
     def parse(cls: t.Type['HttpRequest'], reader: t.Optional[t.BinaryIO]=None) -> 'HttpRequest':
@@ -119,11 +126,14 @@ class HttpResponse(object):
             writer.write(body)
             writer.flush()
 
-def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.Optional[t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]]=None) -> None:
+def run(
+    handler: t.Callable[[HttpRequest, HttpResponse], None],
+    middlewares: t.Optional[t.List[t.Callable[[HttpRequest, HttpResponse, int], t.Optional[bool]]]]=None
+) -> None:
     try:
         req = HttpRequest.parse()
         res = HttpResponse(200)
-        proceed = True
+        proceed = True # type: t.Optional[bool]
         if middlewares is None:
             middlewares = []
         for m in middlewares:
@@ -136,4 +146,4 @@ def run(handler: t.Callable[[HttpRequest, HttpResponse], None], middlewares: t.O
                 m(req, res, AFTER_REQUEST)
         res.output()
     except:
-        sys.stdout.write(CRITICAL_ERROR_RESPONSE + traceback.format_exc())
+        sys.stdout.write(CRITICAL_ERROR_RESPONSE)

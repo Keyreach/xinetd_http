@@ -24,13 +24,51 @@ def gzip_middleware(req: HttpRequest, res: HttpResponse, stage: int) -> None:
             body = res.body.encode('utf-8') if not res.is_binary else res.body # type: bytes
             res.set_body(gzip.compress(body))
 
+class CorsMiddleware():
+    def __init__(
+        self,
+        methods: t.List[str],
+        origins: t.Optional[t.List[str]]=None,
+        headers: t.Optional[t.List[str]]=None,
+        handle_options: bool=True
+    ):
+        self.cors_headers = {}
+        self.cors_headers['access-control-allow-methods'] = ', '.join([
+            method.upper()
+            for method in
+            set(['options', *methods])
+        ])
+        if origins is None:
+            self.cors_headers['access-control-allow-origin'] = '*'
+        if headers is not None:
+            self.cors_headers['access-control-allow-headers'] = ', '.join(headers)
+        self.origins = None if origins is None else set(origins)
+        self.handle_options = handle_options
+
+    def __call__(self, req: HttpRequest, res: HttpResponse, stage: int) -> t.Optional[bool]:
+        if stage == 0 and req.method == 'OPTIONS' and self.handle_options:
+            origin = req.headers.get('origin', None)
+            if origin is not None and (self.origins is None or origin in self.origins):
+                for name, value in self.cors_headers.items():
+                    res.set_header(name, value)
+                if self.origins is not None:
+                    res.set_header('access-control-allow-origin', origin)
+            return False
+        elif stage == 1:
+            origin = req.headers.get('origin', None)
+            if origin is not None and (self.origins is None or origin in self.origins):
+                for name, value in self.cors_headers.items():
+                    res.set_header(name, value)
+                if self.origins is not None:
+                    res.set_header('access-control-allow-origin', origin)
+
 class RedisLimiter():
     def __init__(self, prefix: str, redis_url: str, limit: int, period: int):
         self.redis = redis.from_url(redis_url)
         self.prefix = prefix
         self.limit = limit
         self.period = period
-    
+
     def __call__(self, req: HttpRequest, res: HttpResponse, stage: int) -> t.Optional[bool]:
         if stage == BEFORE_REQUEST:
             key = self.prefix + ':' + req.remote_host
@@ -49,7 +87,7 @@ class RedisCache():
         self.redis = redis.from_url(redis_url)
         self.prefix = prefix
         self.max_age = max_age
-    
+
     def __call__(self, req: HttpRequest, res: HttpResponse, stage: int) -> t.Optional[bool]:
         if req.method not in ('GET', 'OPTIONS'):
             return
