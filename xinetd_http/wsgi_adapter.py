@@ -15,11 +15,11 @@ class Adapter(object):
         headers['content-type'] = environ.get('CONTENT_TYPE', 'application/octet-stream')
         headers['content-length'] = environ.get('CONTENT_LENGTH', 0)
         body = b''
-        if 'CONTENT_LENGTH' in environ:
+        if 'CONTENT_LENGTH' in environ and environ['CONTENT_LENGTH'] != '':
             body = environ['wsgi.input'].read(int(environ['CONTENT_LENGTH']))
         return HttpRequest(
             environ['REQUEST_METHOD'].upper(),
-            environ['REQUEST_URI'],
+            environ['REQUEST_URI'] if 'REQUEST_URI' in environ else environ['PATH_INFO'],
             headers,
             { 'REMOTE_HOST': environ['REMOTE_HOST'] },
             body
@@ -44,8 +44,8 @@ class Adapter(object):
             list(res.headers.items())
         )
         if not res.is_binary and isinstance(res.body, str):
-            yield res.body.encode('utf-8')
+            return [res.body.encode('utf-8')]
         elif isinstance(res.body, bytes):
-            yield res.body
+            return [res.body]
         else:
-            yield b''
+            return [b'']
